@@ -1,0 +1,39 @@
+#!/bin/bash
+
+do_git()
+{
+    unset git &> /dev/null
+    unalias git &> /dev/null
+    unset -f git &> /dev/null
+
+
+    gitRealPath=$(command -v git.exe)
+    declare -A git_libs
+
+    for i in `ldd ${gitRealPath} | grep so | sed -e '/^[^\t]/ d' | sed -e 's/\t//' | sed -e 's/.*=..//' | sed -e 's/ (0.*)//' | sort | uniq`
+    do
+        lib_dir=$(dirname $i)
+        if [[ $lib_dir == /* ]]
+        then
+            git_libs["$lib_dir"]="$lib_dir"
+        fi
+    done
+
+    lib_path=""
+    for x in "${!git_libs[@]}"
+    do
+#       printf "[%s]=%s\n" "$x" "${git_libs[$x]}"
+
+        if [[ ${lib_path} == "" ]]
+        then
+            lib_path=$x
+        else
+            lib_path="$lib_path:$x"
+        fi
+    done
+
+    cmd="LD_LIBRARY_PATH=${lib_path};DYLD_LIBRARY_PATH=${lib_path} ${gitRealPath} $@"
+	LD_LIBRARY_PATH=${lib_path};DYLD_LIBRARY_PATH=${lib_path} ${gitRealPath} "$@"
+}
+
+do_git "$@"
