@@ -71,15 +71,15 @@ RUN git clone https://github.com/forwardmeasure/conan ${CONAN_BUILD_DIR}
 #COPY conan ${CONAN_BUILD_DIR}
 RUN ${CONAN_BUILD_DIR}/conan_export.sh -d ${CONAN_BUILD_DIR}/recipes
 
-# Install non-TF libraries
+# Install CUDA version
 FROM DEV_LIBS_CONAN_SETUP AS DEV_LIBS_WITH_NO_TF
 RUN ${CONAN_BUILD_DIR}/conan_install.sh -e ${ACCELERATION_ENGINE} -c ${COMPILER} -o all -f ${CONAN_BUILD_DIR}/conanfile.txt && \
     conan remove "*" -s -b -f
 
-# Install TF libraries
-FROM DEV_LIBS_CONAN_SETUP AS DEV_LIBS_WITH_TF
-RUN ${CONAN_BUILD_DIR}/conan_install.sh -e ${ACCELERATION_ENGINE} -c ${COMPILER} -o all -f ${CONAN_BUILD_DIR}/conanfile-tf.txt && \
-    conan remove "*" -s -b -f &&  rm -rf ${CONAN_USER_HOME}/BAZEL_CACHE
+# Install CPU version
+FROM DEV_LIBS_CONAN_SETUP AS DEV_LIBS_WITH_NO_TF
+RUN ${CONAN_BUILD_DIR}/conan_install.sh -e cpu -c ${COMPILER} -o all -f ${CONAN_BUILD_DIR}/conanfile.txt && \
+    conan remove "*" -s -b -f
 
 ADD distributions/ubi8/entrypoint.sh /
 ENTRYPOINT ["/entrypoint.sh"]
