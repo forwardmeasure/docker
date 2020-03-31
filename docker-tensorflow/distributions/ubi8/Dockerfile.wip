@@ -1,0 +1,78 @@
+FROM ${BASE_IMAGE_NAME} as base_stage
+
+ARG cmake_version=3.16.2
+ARG bazel_version=0.29.1
+
+LABEL version="1.0.0" \
+    description="Tensorflow C++ CUDA 10.2 Runtime Server"
+
+ENV CONAN_USER_HOME=/opt/conan \
+    SW_BUILD_DIR=/opt/bt/build \
+    SW_DOWNLOADS_DIR=/opt/bt/downloads \
+    CMAKE_SCRIPT=install_cmake.py \
+    BAZEL_SCRIPT=install_bazel.py \
+    CMAKE_VERSION=$cmake_version \
+    BAZEL_VERSION=$bazel_version \
+    CMAKE_INSTALL_DIR=/opt/cmake/${CMAKE_VERSION} \
+    BAZEL_INSTALL_DIR=/opt/google/bazel/${BAZEL_VERSION} \
+    CUDA_HOME=/usr/local/cuda 
+
+ENV CONAN_BUILD_DIR=${SW_BUILD_DIR}/conan \
+    PATH="$PATH:${CMAKE_INSTALL_DIR}/bin:${BAZEL_INSTALL_DIR}/bin" \
+    LANG=en_US.UTF-8 \
+    LC_ALL=en_US.UTF-8 \ 
+    LANGUAGE=en_US.UTF-8 \
+    LC_COLLATE=C \
+    LC_CTYPE=en_US.UTF-8
+
+RUN yum update -y; yum clean all; yum -y upgrade && \
+    yum install -y glibc-langpack-en curl grep sed gcc gcc-c++ wget unzip pkg-config \
+    make autoconf libtool tar xz cpio patch file golang python36 git \
+    java-1.8.0-openjdk-devel
+
+RUN rm -f /var/lib/rpm/__db* && rm -rf /var/lib/rpmrebuilddb.* && \
+    rpm --rebuilddb &> /dev/null; cp -rf /var/lib/rpmrebuilddb.*/* /var/lib/rpm; rm -rf /var/lib/rpmrebuilddb.*
+
+RUN mkdir -p ${SW_DOWNLOADS_DIR} && mv /usr/bin/git /usr/bin/git.exe
+COPY git /usr/bin/git
+
+# Download CMake and Bazel installers
+COPY ${CMAKE_SCRIPT} ${BAZEL_SCRIPT} ${SW_DOWNLOADS_DIR}/
+
+RUN alternatives --set python /usr/bin/python3 && \
+    update-alternatives --install /usr/bin/pip pip /usr/bin/pip3 1 && \
+    pip install numpy conan;
+
+#Install CMake
+RUN cd ${SW_DOWNLOADS_DIR} && python ./${CMAKE_SCRIPT} --cmake-version=${CMAKE_VERSION} \
+    --cmake-install-dir=${CMAKE_INSTALL_DIR} \
+    --cmake-build-dir=${SW_BUILD_DIR}/cmake
+
+#Install Bazel
+RUN cd ${SW_DOWNLOADS_DIR} && python ./${BAZEL_SCRIPT} --bazel-version=${BAZEL_VERSION} \
+    --bazel-install-dir=${BAZEL_INSTALL_DIR} \
+    --bazel-build-dir=${SW_BUILD_DIR}/bazel
+
+ENV PATH ${CUDA_HOME}/bin:${PATH}
+ENV LD_LIBRARY_PATH ${CUDA_HOME}/lib64:${CUDNN_HOME}/lib64
+
+COPY conan ${CONAN_BUILD_DIR}
+
+FROM base_stage as conan_build_stage
+
+# Now build the various images
+RUN \
+    # CPU Images
+    ${CONAN_BUILD_DIR}/conan_export_install.sh -e cpu -c gcc_8 -o all -d ${CONAN_BUILD_DIR}/custom_builds -f ${CONAN_BUILD_DIR}/conanfile.txt && \
+    ${CONAN_BUILD_DIR}/conan_export_install.sh -e cpu -c gcc_8 -o safe -d ${CONAN_BUILD_DIR}/custom_builds -f ${CONAN_BUILD_DIR}/conanfile.txt && \
+    ${CONAN_BUILD_DIR}/conan_export_install.sh -e cpu -c gcc_8 -o none -d ${CONAN_BUILD_DIR}/custom_builds -f ${CONAN_BUILD_DIR}/conanfile.txt && \
+    # CUDA Images
+    ${CONAN_BUILD_DIR}/conan_export_install.sh -e cuda_10 -c gcc_8 -o all -d ${CONAN_BUILD_DIR}/custom_builds -f ${CONAN_BUILD_DIR}/conanfile.txt && \
+    ${CONAN_BUILD_DIR}/conan_export_install.sh -e cuda_10 -c gcc_8 -o safe -d ${CONAN_BUILD_DIR}/custom_builds -f ${CONAN_BUILD_DIR}/conanfile.txt && \
+    ${CONAN_BUILD_DIR}/conan_export_install.sh -e cuda_10 -c gcc_8 -o none -d ${CONAN_BUILD_DIR}/custom_builds -f ${CONAN_BUILD_DIR}/conanfile.txt
+
+# Clean up source and build artefacts
+RUN conan remove "*" -s -b -f &&  rm -rf ${CONAN_USER_HOME}/BAZEL_CACHE
+
+ADD entrypoint.sh /
+ENTRYPOINT ["/entrypoint.sh"]
