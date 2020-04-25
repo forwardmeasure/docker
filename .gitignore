@@ -1,0 +1,58 @@
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+/.idea
+
+.idea/
+.vscode/
+
+# Netbeans
+**/nbactions.xml
+**/nb-configuration.xml
+
+cmake_build/
+cmake-build-debug/
+.idea/**
+
+# VSCode
+**/.vscode/*
+**/vscode-build-Debug/*
+
+# Conan build
+**/conan/CMakeModules/*
+
+/portend-api-grpc/CMakeDeps.cmake
+/portend-api-grpc/gen-src/**
+/portend-grpc-utils/gen-src/**
+
+build

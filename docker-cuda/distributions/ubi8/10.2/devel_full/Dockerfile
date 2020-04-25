@@ -1,5 +1,5 @@
 FROM registry.access.redhat.com/ubi8/ubi:latest
-LABEL maintainer "Prashanth Nandavanam <pn@forwardmeasure.com>"
+LABEL maintainer "Prashanth Nandavanam <pnandavanam@bottomline.com>"
 
 RUN NVIDIA_GPGKEY_SUM=d1be581509378368edeec8c1eb2958702feedf3bc3d17011adbf24efacce4ab5 && \
     curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/rhel7/x86_64/7fa2af80.pub | sed '/^Version/d' > /etc/pki/rpm-gpg/RPM-GPG-KEY-NVIDIA && \
@@ -55,7 +55,7 @@ ENV NVIDIA_REQUIRE_CUDA "cuda>=10.2 brand=tesla,driver>=384,driver<385 brand=tes
 ENV CUDA_HOME /usr/local/cuda
 ENV PATH /usr/local/cuda/bin:${PATH}
 ENV LD_LIBRARY_PATH /usr/local/nvidia/lib64
-ENV LIBRARY_PATH /usr/local/cuda/lib64/stubs
+ENV LIBRARY_PATH ${LIBRARY_PATH:+${LIBRARY_PATH}:}/usr/local/cuda/lib64/stubs
 
 # Lock in the versions
 RUN rm /etc/yum.repos.d/cuda.repo

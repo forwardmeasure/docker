@@ -65,21 +65,35 @@ ENV LD_LIBRARY_PATH ${CUDA_HOME}/lib64:${CUDNN_HOME}/lib64
 # Weird fix-up for libnsl
 RUN ln -s /usr/lib64/libnsl.so.2 /usr/lib64/libnsl.so
 
-FROM BASE_STAGE as DEV_LIBS_CONAN_SETUP
-
 RUN git clone https://github.com/forwardmeasure/conan ${CONAN_BUILD_DIR}
-#COPY conan ${CONAN_BUILD_DIR}
 RUN ${CONAN_BUILD_DIR}/conan_export.sh -d ${CONAN_BUILD_DIR}/recipes
 
-# Install CUDA version
-FROM DEV_LIBS_CONAN_SETUP AS DEV_LIBS_WITH_NO_TF
-RUN ${CONAN_BUILD_DIR}/conan_install.sh -e ${ACCELERATION_ENGINE} -c ${COMPILER} -o all -f ${CONAN_BUILD_DIR}/conanfile.txt && \
-    conan remove "*" -s -b -f
+FROM BASE_STAGE AS DEV_LIBS_PREP
 
-# Install CPU version
-FROM DEV_LIBS_CONAN_SETUP AS DEV_LIBS_WITH_NO_TF
+# Build all flavours
+FROM DEV_LIBS_PREP AS DEV_LIBS_TF_CUDA_ALL
+RUN ${CONAN_BUILD_DIR}/conan_install.sh -e ${ACCELERATION_ENGINE} -c ${COMPILER} -o all -f ${CONAN_BUILD_DIR}/conanfile.txt && \
+    conan remove "*" -s -b -f &&  rm -rf ${CONAN_USER_HOME}/BAZEL_CACHE
+
+FROM DEV_LIBS_TF_CUDA_ALL AS DEV_LIBS_TF_CUDA_SAFE
+RUN ${CONAN_BUILD_DIR}/conan_install.sh -e ${ACCELERATION_ENGINE} -c ${COMPILER} -o safe -f ${CONAN_BUILD_DIR}/conanfile.txt && \
+    conan remove "*" -s -b -f &&  rm -rf ${CONAN_USER_HOME}/BAZEL_CACHE
+
+FROM DEV_LIBS_TF_CUDA_SAFE AS DEV_LIBS_TF_CUDA_NONE
+RUN ${CONAN_BUILD_DIR}/conan_install.sh -e ${ACCELERATION_ENGINE} -c ${COMPILER} -o none -f ${CONAN_BUILD_DIR}/conanfile.txt && \
+    conan remove "*" -s -b -f &&  rm -rf ${CONAN_USER_HOME}/BAZEL_CACHE
+
+FROM DEV_LIBS_TF_CUDA_NONE AS DEV_LIBS_TF_CPU_ALL
 RUN ${CONAN_BUILD_DIR}/conan_install.sh -e cpu -c ${COMPILER} -o all -f ${CONAN_BUILD_DIR}/conanfile.txt && \
-    conan remove "*" -s -b -f
+    conan remove "*" -s -b -f &&  rm -rf ${CONAN_USER_HOME}/BAZEL_CACHE
+
+FROM DEV_LIBS_TF_CPU_ALL AS DEV_LIBS_TF_CPU_SAFE
+RUN ${CONAN_BUILD_DIR}/conan_install.sh -e cpu -c ${COMPILER} -o safe -f ${CONAN_BUILD_DIR}/conanfile.txt && \
+    conan remove "*" -s -b -f &&  rm -rf ${CONAN_USER_HOME}/BAZEL_CACHE
+
+FROM DEV_LIBS_TF_CPU_SAFE AS DEV_LIBS_TF_CPU_NONE
+RUN ${CONAN_BUILD_DIR}/conan_install.sh -e cpu -c ${COMPILER} -o none -f ${CONAN_BUILD_DIR}/conanfile.txt && \
+    conan remove "*" -s -b -f &&  rm -rf ${CONAN_USER_HOME}/BAZEL_CACHE
 
 ADD distributions/ubi8/entrypoint.sh /
 ENTRYPOINT ["/entrypoint.sh"]
